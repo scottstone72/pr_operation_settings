@@ -1,0 +1,196 @@
+<?php
+
+/**
+ *	Implements hook_permission().
+ */
+function pr_operation_settings_permission() {
+  return array(
+    'view pr operation settings' => array(
+      'title' => t('Access PR Operation Settings'),
+      'description' => t('Access to the PR Operation Settings form.'),
+      'restrict access' => TRUE,
+    ),
+  );
+}
+
+/**
+ * Implements hook_menu().
+ */
+
+function pr_operation_settings_menu() {
+  $items = array();
+
+  // Admin configuration group.
+  $items['admin/config/pr_operation'] = array(
+    'title' => 'PR Operations',
+    'description' => t('PR Operation Settings page.'),
+    'access arguments' => array('view pr operation settings'),
+  );
+
+  // Admin configuration - Settings.
+  $items['admin/config/pr_operation/custom_settings'] = array(
+    'title' => 'Custom Settings',
+    'description' => t('Manage PR Operation Custom Settings.'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('pr_operation_settings_form'),
+    'access arguments' => array('view pr operation settings'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_form().
+ * This form is for enabling or disabling alerts.
+ * @param $form
+ * @param $form_state
+ * @return mixed
+ */
+function pr_operation_settings_form($form, &$form_state) {
+
+  $form['checklist_enable_alerts'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable Checklist Inspection Alerts'),
+    '#default_value' => variable_get('checklist_alerts_enable', 0),
+    '#attributes' => array('id' => array('checklist_alerts')),
+  );
+
+  $form['repair_enable_alerts'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable Repair Order Alerts'),
+    '#default_value' => variable_get('repair_alerts_enable', 0),
+    '#attributes' => array('id' => array('repair_alerts')),
+  );
+
+  $form['submit_button'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+  );
+
+  return $form;
+}
+
+/**
+ * Submit function for pr_operation_settings_form
+ * @param $form
+ * @param $form_state
+ */
+function pr_operation_settings_form_submit($form, &$form_state) {
+
+  variable_set('checklist_alerts_enable', $form_state['values']['checklist_enable_alerts']);
+  variable_set('repair_alerts_enable', $form_state['values']['repair_enable_alerts']);
+  drupal_set_message(t('The new settings have been saved.'));
+
+}
+
+/**
+ * This implements hook_cron().
+ * This cron job will search the database in the appropriate tables for dates matching the current date and if there is
+ * a match it will send an alert email with description saying its time to follow up on this item.
+ */
+function pr_operation_settings_cron() {
+  // If variable TRUE then Alerts have been enabled for Checklist Inspections
+  if (variable_get('checklist_alerts_enable', 0)) {
+
+    $query = db_select('checklist_inspections', 'c')
+      ->fields('c', array('order_num','category','unit_id','date_submitted','follow_up_alert','completed'))
+      ->condition('follow_up_alert', date('M d, Y'), '=')
+      ->execute();
+
+    foreach ($query as $key => $val) {
+
+      $params['order_num'] =  check_plain($val->order_num);
+      $params['category'] = check_plain($val->category);
+      $params['unit_id'] = check_plain($val->unit_id);
+      $params['date'] = check_plain($val->date_submitted);
+      $params['follow_up_alert'] = check_plain($val->follow_up_alert);
+
+      // Get emails that have been set in the transfer request configuration page.
+      $admin_mail = variable_get('transfer_admin_email');
+      // Send email to administrator notifying him of request.
+      $to = $admin_mail;
+      $from = 'Checklist Inspection Alerts' . ' - ' . check_plain($val->unit_id);
+
+      $sent = drupal_mail('pr_operation_settings', 'checklist_alert', $to, language_default(), $params, $from, TRUE);
+      // Show error if mail does not get sent for whatever reason.
+      if(!$sent) {
+        watchdog('pr_operation_settings', 'Mail could not be sent!', $params);
+      }
+    }
+  }
+
+
+  $get_repair_alerts = variable_get('repair_alerts_enable', 0);
+
+  // If variable TRUE then Alerts have been enabled for Repair Orders
+  if (isset($get_repair_alerts) !== 0) {
+
+    $query = db_select('repair_orders', 'r')
+      ->fields('r', array('order_num','category','unit_id','date_submitted','follow_up_alert','completed'))
+      ->condition('follow_up_alert', date('M d, Y'), '=')
+      ->execute();
+
+    foreach ($query as $key => $val) {
+
+      $params['order_num'] =  check_plain($val->order_num);
+      $params['category'] = check_plain($val->category);
+      $params['unit_id'] = check_plain($val->unit_id);
+      $params['date'] = check_plain($val->date_submitted);
+      $params['follow_up_alert'] = check_plain($val->follow_up_alert);
+
+      // Get emails that have been set in the transfer request configuration page.
+      $admin_mail = variable_get('transfer_admin_email');
+      // Send email to administrator notifying him of request.
+      $to = $admin_mail;
+      $from = 'Repair Order Alerts' . ' - ' . check_plain($val->unit_id);
+
+      $sent = drupal_mail('pr_operation_settings', 'repair_alert', $to, language_default(), $params, $from, TRUE);
+      // Show error if mail does not get sent for whatever reason.
+      if(!$sent) {
+        watchdog('pr_operation_settings', 'Mail could not be sent!', $params);
+      }
+    }
+  }
+
+}
+
+
+/**
+ * Implements hook_mail()
+ * Using to send email from transfer request submissions to administrator
+ * @param string $key
+ * @param array $message
+ * @param array $params
+ *
+ */
+function pr_operation_settings_mail($key, &$message, $params) {
+  $language = $message['language'];
+  switch ($key) {
+    case 'checklist_alert':
+      $vars = array();
+      $order_num = check_plain($params['order_num']);
+      $date = check_plain($params['date']);
+      $category = check_plain($params['category']);
+      $unit_id = check_plain($params['unit_id']);
+
+      $message['subject'] = t('Checklist Inspections Alert', $vars, array($language->language));
+      $message['body'][] = "A follow up is <span style='color: red'>NOW REQUIRED</span> for Checklist Inspections Order # $order_num - $category -- $unit_id
+        that was submitted on $date, please click the following link below to view. \n\n"  .
+          l('Login ','http://ponderosarentals.com/checklist_inspections_approval');
+      break;
+
+    case 'repair_alert':
+      $vars = array();
+      $order_num = check_plain($params['order_num']);
+      $date = check_plain($params['date']);
+      $category = check_plain($params['category']);
+      $unit_id = check_plain($params['unit_id']);
+
+      $message['subject'] = t('Repair Order Alert', $vars, array($language->language));
+      $message['body'][] = "A follow up is <span style='color: red'>NOW REQUIRED</span> for Repair Order # $order_num - $category -- $unit_id
+        that was submitted on $date, please click the following link below to view. \n\n"  .
+        l('Login ','http://ponderosarentals.com/repair_order_approval');
+      break;
+  }
+}
