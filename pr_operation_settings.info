@@ -1,0 +1,7 @@
+name = PR Operation Settings
+description = Configuration and settings page for Ponderosa Rentals site operations.
+core = 7.x
+version = 7.x - v2.0
+package = Ponderosa Rentals Modules
+
+files[] = pr_operation_settings.module
