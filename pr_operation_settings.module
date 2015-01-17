@@ -37,21 +37,21 @@ function pr_operation_settings_menu() {
     'type' => MENU_NORMAL_ITEM,
   );
 
-  // Admin configuration group.
-  $items['admin/config/transfer_request_form'] = array(
-    'title' => 'Transfer Request',
-    'description' => t('Form for transfer of rental equipment.'),
-    'access arguments' => array('View Transfer Request Approvals'),
-  );
-
-  // Admin configuration - Settings.
-  $items['admin/config/transfer_request_form/settings'] = array(
-    'title' => 'Form Settings',
-    'description' => t('Manage Transfer Request Form configuration settings.'),
-    'access arguments' => array('view transfer approvals and submissions'),
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('transfer_admin_settings_form'),
-  );
+//  // Admin configuration group.
+//  $items['admin/config/transfer_request_form'] = array(
+//    'title' => 'Transfer Request',
+//    'description' => t('Form for transfer of rental equipment.'),
+//    'access arguments' => array('View Transfer Request Approvals'),
+//  );
+//
+//  // Admin configuration - Settings.
+//  $items['admin/config/transfer_request_form/settings'] = array(
+//    'title' => 'Form Settings',
+//    'description' => t('Manage Transfer Request Form configuration settings.'),
+//    'access arguments' => array('view transfer approvals and submissions'),
+//    'page callback' => 'drupal_get_form',
+//    'page arguments' => array('transfer_admin_settings_form'),
+//  );
 
   return $items;
 }
